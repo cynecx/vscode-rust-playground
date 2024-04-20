@@ -1,0 +1,9 @@
+{
+    "name": "Rust Playground",
+    "scopeName": "source.rust-playground",
+    "patterns": [
+        {
+            "include": "source.rust"
+        }
+    ]
+}
