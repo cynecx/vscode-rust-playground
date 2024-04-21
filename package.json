@@ -3,6 +3,7 @@
     "displayName": "vscode-rust-playground",
     "description": "Rust Playground",
     "version": "0.0.1",
+    "publisher": "cynecx",
     "engines": {
         "vscode": "^1.88.0"
     },
@@ -27,26 +28,31 @@
         ]
     },
     "scripts": {
-        "vscode:prepublish": "pnpm run compile",
+        "vscode:prepublish": "pnpm run build-package",
+        "package": "vsce package --no-dependencies --allow-missing-repository -o vscode-rust-playground.vsix",
+        "build-package": "esbuild ./src/extension.ts --bundle --sourcemap --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "pretest": "pnpm run compile && pnpm run lint",
         "lint": "eslint src --ext ts",
-        "test": "vscode-test"
+        "prettier": "prettier ./src --write"
     },
     "devDependencies": {
-        "@types/vscode": "^1.88.0",
-        "@types/mocha": "^10.0.6",
         "@types/node": "18.x",
+        "@types/vscode": "^1.88.0",
         "@typescript-eslint/eslint-plugin": "^7.4.0",
         "@typescript-eslint/parser": "^7.4.0",
+        "@vscode/vsce": "^2.26.0",
+        "esbuild": "^0.20.2",
         "eslint": "^8.57.0",
-        "typescript": "^5.3.3",
-        "@vscode/test-cli": "^0.0.8",
-        "@vscode/test-electron": "^2.3.9"
+        "prettier": "3.2.5",
+        "typescript": "^5.4.5"
     },
     "prettier": {
         "tabWidth": 4,
         "printWidth": 100
+    },
+    "dependencies": {
+        "ansi-sequence-parser": "^1.1.1"
     }
 }
