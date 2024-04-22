@@ -1,8 +1,9 @@
-import querystring from "node:querystring";
+import { nextTick } from "node:process";
 import * as vscode from "vscode";
 import { CodeLensProvider } from "./codelens";
 import { PlaygroundCommand } from "./command";
 import { Env } from "./env";
+import { extractInnerUri } from "./uri";
 
 class PlaygroundTextDocumentContentProvider implements vscode.TextDocumentContentProvider {
     constructor(private readonly env: Env) {}
@@ -11,12 +12,18 @@ class PlaygroundTextDocumentContentProvider implements vscode.TextDocumentConten
         uri: vscode.Uri,
         _token: vscode.CancellationToken,
     ): vscode.ProviderResult<string> {
-        const args = querystring.parse(uri.query);
-        const rawInnerUri = args["innerUri"];
-        if (typeof rawInnerUri !== "string") {
+        const innerUri = extractInnerUri(uri);
+        if (!innerUri) {
             return null;
         }
-        return this.env.getMappedDocument(vscode.Uri.parse(rawInnerUri))?.content ?? null;
+        const content = this.env.getMappedDocument(innerUri)?.content ?? null;
+        if (content) {
+            // HACK: Apply the decorations after the text editor / document has loaded the new content.
+            setTimeout(() => {
+                this.env.applyDecorations(uri);
+            }, 100);
+        }
+        return content;
     }
 
     get onDidChange(): vscode.Event<vscode.Uri> {
@@ -33,12 +40,9 @@ export function activate(context: vscode.ExtensionContext) {
         env,
         vscode.workspace.onDidCloseTextDocument((document) => {
             let uri = document.uri;
-            if (uri.scheme === "vscode-rust-playground") {
-                const args = querystring.parse(uri.query);
-                const rawInnerUri = args["innerUri"];
-                if (typeof rawInnerUri === "string") {
-                    uri = vscode.Uri.parse(rawInnerUri);
-                }
+            const innerUri = extractInnerUri(uri);
+            if (innerUri) {
+                uri = innerUri;
             }
             env.removeMappedDocument(uri);
         }),

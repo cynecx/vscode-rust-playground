@@ -1,12 +1,18 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import querystring from "node:querystring";
 import * as vscode from "vscode";
 import { AnsiColor, parse as parseAnsi } from "./ansi";
+import { encodeInnerUri, extractInnerUri } from "./uri";
 import { groupBy } from "./utils";
 
-export type MappedDocument = { content?: string };
+export type MappedDocument = {
+    content?: string;
+    decorations?: {
+        key: vscode.TextEditorDecorationType;
+        values: vscode.Range[];
+    }[];
+};
 
 export class Env implements vscode.Disposable {
     private tempPath: string | null = null;
@@ -21,7 +27,9 @@ export class Env implements vscode.Disposable {
 
     private disposables: vscode.Disposable[] | null = [];
 
-    constructor() {}
+    constructor() {
+        this.disposables?.push(this.mappedDocumentEventEmitter);
+    }
 
     dispose() {
         const disposables = this.disposables;
@@ -96,42 +104,60 @@ export class Env implements vscode.Disposable {
 
     async openAnsiContent(ansiContent: string, forTextDocument: vscode.TextDocument) {
         const parsed = parseAnsi(this, ansiContent);
+        const decorators = groupBy(
+            parsed.decorations,
+            (entry) => entry.decorationType,
+            (decoratorType) => decoratorType.key,
+            (_key, val) => val.range,
+        );
 
         const documentUri = forTextDocument.uri;
 
         const mappedDocument = this.getMappedDocument(documentUri, true);
         mappedDocument!.content = parsed.content;
+        mappedDocument!.decorations = decorators;
 
         const origFileName = path.basename(`${documentUri.path}`);
         const newFileName = `Playground - ${origFileName}`;
 
-        const uri = vscode.Uri.parse(
-            `vscode-rust-playground:${newFileName}?${querystring.stringify({
-                innerUri: documentUri.toString(),
-            })}`,
+        const uri = encodeInnerUri(
+            vscode.Uri.parse(`vscode-rust-playground:${newFileName}`),
+            documentUri,
         );
 
         const openedDocument = await vscode.workspace.openTextDocument(uri);
 
         this.mappedDocumentEventEmitter.fire(uri);
 
+        vscode.window.showTextDocument(openedDocument, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: true,
+        });
+    }
+
+    async applyDecorations(documentUri: vscode.Uri) {
+        const innerUri = extractInnerUri(documentUri);
+        if (!innerUri) {
+            return;
+        }
+
+        const mappedDocument = this.getMappedDocument(innerUri);
+        if (!mappedDocument?.content || !mappedDocument.decorations?.length) {
+            return;
+        }
+
+        const openedDocument = await vscode.workspace.openTextDocument(documentUri);
         const textEditor = await vscode.window.showTextDocument(openedDocument, {
             viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: true,
         });
 
         for (const decoratorStyleType of this.registeredDecoratorStyleTypes()) {
             textEditor.setDecorations(decoratorStyleType, []);
         }
 
-        for (const { key, values } of groupBy(
-            parsed.decorations,
-            (entry) => entry.decorationType,
-            (decoratorType) => decoratorType.key,
-            (_key, val) => val.range,
-        )) {
+        for (const { key, values } of mappedDocument.decorations) {
             textEditor.setDecorations(key, values);
         }
-
-        this.mappedDocumentEventEmitter.fire(uri);
     }
 }
