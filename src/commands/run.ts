@@ -7,6 +7,7 @@ import { PlaygroundCommand } from "../command";
 import { Env } from "../env";
 import { withCleanupScope } from "../fs";
 import { extractContentAt, parseOptionLineAt } from "../pattern";
+import { wrapText } from "../ansi";
 
 const child_process = {
     exec: util.promisify(nodeChildProcess.exec),
@@ -33,7 +34,7 @@ export class RunSnippetCommand extends PlaygroundCommand {
         }
 
         let profile: "debug" | "release" | null = null;
-        let edition: "2021" | "2024" | null = null;
+        let edition: "2018" | "2021" | "2024" | null = null;
         let channel: "stable" | "nightly" | null = null;
 
         for (const optionString of optionLine.split(",")) {
@@ -43,6 +44,7 @@ export class RunSnippetCommand extends PlaygroundCommand {
             }
 
             switch (trimmed) {
+                case "2018":
                 case "2021":
                 case "2024":
                     edition = trimmed;
@@ -67,6 +69,10 @@ export class RunSnippetCommand extends PlaygroundCommand {
         edition ||= "2021";
         channel ||= "stable";
         profile ||= "debug";
+
+        if (edition === "2024") {
+            channel = "nightly";
+        }
 
         const snippet = extractContentAt(this.document, this.line);
 
@@ -96,29 +102,61 @@ export class RunSnippetCommand extends PlaygroundCommand {
                     deferCleanupFor(outFileName);
                     deferCleanupFor(`${outFileName}.dSYM`, true);
 
-                    const buildCmd = `rustc +${channel} --color=always --edition=${edition} -g ${
-                        profile === "release" ? "-O" : ""
-                    } -o ${outFilePath} ${sourceFilePath}`;
+                    let buildCmdParts = ["rustc"];
 
-                    output += `> ${buildCmd}\n\n`;
+                    buildCmdParts.push(`+${channel}`);
+                    buildCmdParts.push(`--edition=${edition}`);
+                    if (channel === "nightly") {
+                        buildCmdParts.push("-Zunstable-options");
+                    }
+                    if (profile === "release") {
+                        buildCmdParts.push("-O");
+                    }
+                    buildCmdParts.push("-g");
+                    buildCmdParts.push("--color=always");
+                    buildCmdParts.push(`-o ${outFilePath}`);
+                    buildCmdParts.push(sourceFilePath);
+
+                    const buildCmd = buildCmdParts.join(" ");
+
+                    output += wrapText(`> ${buildCmd}\n\n`, { dim: true });
 
                     const buildProcess = child_process.exec(buildCmd, {
                         cwd: tempPath,
                         signal: abortController.signal,
                     });
+
+                    let exitCode: number;
+
                     try {
                         const result = await buildProcess;
                         output += result.stdout;
                         output += result.stderr;
-                        output += `\nprocess exit code: 0`;
+                        output += wrapText(`\nprocess exit code: 0`, {
+                            bold: true,
+                            dim: true,
+                            italic: true,
+                        });
+
+                        exitCode = buildProcess.child.exitCode ?? -1;
                     } catch (ex) {
                         const error = ex as ExecException;
                         output += (error as any).stdout;
                         output += (error as any).stderr;
-                        output += `\nprocess exit code: ${error.code}`;
+                        output += wrapText(`\nprocess exit code: ${error.code}`, {
+                            bold: true,
+                            dim: true,
+                            italic: true,
+                        });
+
+                        exitCode = error.code ?? -1;
                     }
 
-                    output += `\n\n> ${outFilePath}\n\n`;
+                    if (exitCode !== 0) {
+                        return output;
+                    }
+
+                    output += wrapText(`\n\n> ${outFilePath}\n\n`, { dim: true });
 
                     const runProcess = child_process.exec(outFilePath, {
                         cwd: tempPath,
@@ -131,12 +169,20 @@ export class RunSnippetCommand extends PlaygroundCommand {
                         const result = await runProcess;
                         output += result.stdout;
                         output += result.stderr;
-                        output += `\nprocess exit code: 0`;
+                        output += wrapText(`\nprocess exit code: 0`, {
+                            bold: true,
+                            dim: true,
+                            italic: true,
+                        });
                     } catch (ex) {
                         const error = ex as ExecException;
                         output += (error as any).stdout;
                         output += (error as any).stderr;
-                        output += `\nprocess exit code: ${error.code}`;
+                        output += wrapText(`\nprocess exit code: ${error.code}`, {
+                            bold: true,
+                            dim: true,
+                            italic: true,
+                        });
                     }
 
                     return output;

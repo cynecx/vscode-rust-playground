@@ -178,3 +178,32 @@ export function parse(
         decorations,
     };
 }
+
+export function dim(inner: (val: string) => string): (val: string) => string {
+    return (val: string) => `\x1b[2m${inner(val)}\x1b[0m`;
+}
+
+export function wrapText(
+    val: string,
+    options: {
+        bold?: boolean;
+        dim?: boolean;
+        italic?: boolean;
+        underline?: boolean;
+    },
+): string {
+    let prefix = "";
+    if (options.bold) {
+        prefix += "\x1b[1m";
+    }
+    if (options.dim) {
+        prefix += "\x1b[2m";
+    }
+    if (options.italic) {
+        prefix += "\x1b[3m";
+    }
+    if (options.underline) {
+        prefix += "\x1b[4m";
+    }
+    return `${prefix}${val}\x1b[0m`;
+}
