@@ -1,4 +1,3 @@
-import { nextTick } from "node:process";
 import * as vscode from "vscode";
 import { CodeLensProvider } from "./codelens";
 import { PlaygroundCommand } from "./command";

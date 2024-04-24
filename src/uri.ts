@@ -1,5 +1,5 @@
-import * as vscode from "vscode";
 import querystring from "node:querystring";
+import * as vscode from "vscode";
 
 export function extractInnerUri(uri: vscode.Uri): vscode.Uri | null {
     if (uri.scheme !== "vscode-rust-playground") {

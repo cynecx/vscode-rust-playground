@@ -46,11 +46,15 @@
         "esbuild": "^0.20.2",
         "eslint": "^8.57.0",
         "prettier": "3.2.5",
+        "prettier-plugin-organize-imports": "^3.2.4",
         "typescript": "^5.4.5"
     },
     "prettier": {
         "tabWidth": 4,
-        "printWidth": 100
+        "printWidth": 100,
+        "plugins": [
+            "prettier-plugin-organize-imports"
+        ]
     },
     "dependencies": {
         "ansi-sequence-parser": "^1.1.1"

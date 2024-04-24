@@ -1,13 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+export type CleanupScopeCallback<R> = (
+    tempPath: string,
+    pathFor: (relativePath: string) => string,
+    deferCleanupFor: (fileName: string, recursive?: boolean) => void,
+) => Promise<R>;
+
 export async function withCleanupScope<R>(
     tempPath: string,
-    cb: (
-        tempPath: string,
-        pathFor: (relativePath: string) => string,
-        deferCleanupFor: (fileName: string, recursive?: boolean) => void,
-    ) => Promise<R>,
+    cb: CleanupScopeCallback<R>,
 ): Promise<R> {
     const resolvedTempPath = path.resolve(tempPath);
 
